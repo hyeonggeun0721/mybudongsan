@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "67731125001",
+    "project_id": "mybudongsan-4616e",
+    "storage_bucket": "mybudongsan-4616e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:67731125001:android:6a1ff8257189e900d5d9d8",
+        "android_client_info": {
+          "package_name": "summer.example.mybudongsan"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDg5LSlGLMw6QdFhuf0KJJ-3OAjAlzOvK4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
