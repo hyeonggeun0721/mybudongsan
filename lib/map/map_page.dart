@@ -1,19 +1,22 @@
 // lib/map/map_page.dart
-// 지도 기반 Firestore 데이터 시각화 및 geoFire 반경 검색 + 상세페이지 이동 기능
-
 import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-// ✅ Firestore 및 geoFire 관련 패키지 임포트
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../geoFire/geoflutterfire.dart';
 import '../geoFire/models/point.dart';
 
 import 'map_filter.dart';
 import 'map_filter_dialog.dart';
-import 'apt_page.dart'; // ✅ 추가: 상세페이지 이동용 import
+import 'apt_page.dart';
+import '../myFavorite/my_favorite_page.dart';
+import '../settings/setting_page.dart';
+
+// ★★★ 1. SharedPreferences import 추가 ★★★
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -23,22 +26,25 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPage extends State<MapPage> {
-  int currentItem = 0; // 현재 하단 탭 상태
-  MapFilter mapFilter = MapFilter(); // 필터 정보 저장 객체
+  int currentItem = 0;
+  MapFilter mapFilter = MapFilter();
 
   late Completer<GoogleMapController> _controller =
-  Completer<GoogleMapController>(); // ✅ late로 재생성 가능
+  Completer<GoogleMapController>();
 
-  Map<MarkerId, Marker> markers = <MarkerId, Marker>{}; // 지도 마커 집합
+  Map<MarkerId, Marker> markers = <MarkerId, Marker>{};
   MarkerId? selectedMarker;
   BitmapDescriptor markerIcon = BitmapDescriptor.defaultMarker;
   late List<DocumentSnapshot> allDocuments =
-  List<DocumentSnapshot>.empty(growable: true); // Firestore 원본 데이터 (400개)
+  List<DocumentSnapshot>.empty(growable: true);
   late List<DocumentSnapshot> documentList =
-  List<DocumentSnapshot>.empty(growable: true); // 필터링된 데이터 (260개)
+  List<DocumentSnapshot>.empty(growable: true);
+
+  // ★★★ 2. 지도 타입을 저장할 변수 추가 ★★★
+  MapType _currentMapType = MapType.normal; // 기본값 normal
 
   static const CameraPosition _googleMapCamera = CameraPosition(
-    target: LatLng(37.571320, 127.029043), // 서울 성북구 중심
+    target: LatLng(37.571320, 127.029043),
     zoom: 15.0,
   );
 
@@ -46,10 +52,23 @@ class _MapPage extends State<MapPage> {
   void initState() {
     super.initState();
     addCustomIcon();
+    _loadMapType(); // 👈 페이지 시작 시 저장된 지도 타입 불러오기
   }
 
-  // ✅ 사용자 정의 마커 아이콘 생성
+  // ★★★ 3. SettingsPage에서 저장한 지도 타입을 불러오는 함수 (새로 추가) ★★★
+  Future<void> _loadMapType() async {
+    final prefs = await SharedPreferences.getInstance();
+    // 'mapType' 키로 저장된 int 값을 불러옵니다. (SettingsPage와 동일한 로직)
+    final int mapTypeIndex = prefs.getInt('mapType') ?? 0;
+    setState(() {
+      _currentMapType = MapType.values[mapTypeIndex];
+    });
+  }
+  // ★★★ (새 함수 추가 끝) ★★★
+
+
   void addCustomIcon() {
+    // ... (이하 _searchApt, _applyFilterAndRedraw, selectedCheck 함수는 기존과 동일) ...
     BitmapDescriptor.asset(
       const ImageConfiguration(),
       'res/images/apartment.png',
@@ -62,7 +81,6 @@ class _MapPage extends State<MapPage> {
     });
   }
 
-  // ✅ Firestore + geoFire 기반 지도 반경 검색 (print문 제거)
   Future<void> _searchApt() async {
     final GoogleMapController controller = await _controller.future;
     final bounds = await controller.getVisibleRegion();
@@ -80,7 +98,7 @@ class _MapPage extends State<MapPage> {
       longitude: centerBounds.longitude,
     );
 
-    const double radius = 50; // 🔍 반경 확장
+    const double radius = 50;
     const String field = 'position';
 
     final Stream<List<DocumentSnapshot>> stream = geo
@@ -88,36 +106,26 @@ class _MapPage extends State<MapPage> {
         .within(center: center, radius: radius, field: field);
 
     stream.listen((List<DocumentSnapshot> documentList) {
-      // 1. 원본 400개를 allDocuments에 저장
       this.allDocuments = documentList;
-      // 2. 필터링 및 그리기 함수를 '최초 1회' 호출
       _applyFilterAndRedraw();
     }, onError: (error) {
       debugPrint("Firestore Stream Error: $error");
     });
   }
 
-  // ✅ (새로운 함수) 원본 데이터를 현재 필터로 거르고 화면을 갱신합니다.
   void _applyFilterAndRedraw() {
-
-    // 1. '임시 마커 바구니' (지도용)
     final Map<MarkerId, Marker> newMarkers = {};
-    // 2. '임시 리스트 바구니' (목록용)
     final List<DocumentSnapshot> filteredList = [];
 
-    // 3. 260개 리스트가 아닌 '원본 400개' 리스트(allDocuments)를 순회
     for (final DocumentSnapshot doc in allDocuments) {
       final Map<String, dynamic> info = doc.data() as Map<String, dynamic>;
 
-      // 4. 현재 'mapFilter' 값으로 필터링 실행
       if (selectedCheck(
         info,
         mapFilter.peopleString,
         mapFilter.carString,
         mapFilter.buildingString,
       )) {
-
-        // 5. 필터 통과시, 마커 바구니에 추가
         final MarkerId markerId = MarkerId(info['position']['geohash']);
         final Marker marker = Marker(
           markerId: markerId,
@@ -143,20 +151,15 @@ class _MapPage extends State<MapPage> {
           ),
         );
         newMarkers[markerId] = marker;
-
-        // 6. 필터 통과시, 리스트 바구니에도 추가
         filteredList.add(doc);
       }
     }
-
-    // 7. '단 한 번'의 setState로 지도와 리스트를 동시에 갱신
     setState(() {
-      markers = newMarkers;        // 👈 1. 맵 갱신
-      this.documentList = filteredList; // 👈 2. 리스트 갱신
+      markers = newMarkers;
+      this.documentList = filteredList;
     });
   }
 
-  // ✅ 필터 조건 비교 (print문 제거)
   bool selectedCheck(
       Map<String, dynamic> info,
       String? peopleString,
@@ -187,11 +190,11 @@ class _MapPage extends State<MapPage> {
         return parking >= 1;
       }
     } catch (e) {
-      // 오류가 발생하면 콘솔에만 조용히 기록합니다.
       debugPrint("Filter Error: $e, Data: $info");
       return false;
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -207,12 +210,9 @@ class _MapPage extends State<MapPage> {
                 ),
               );
               if (result != null) {
-                // 1. 바뀐 필터 값을 저장하고
                 setState(() {
                   mapFilter = result as MapFilter;
                 });
-
-                // 2. ★★★ 지도와 상관없는 '필터링 함수'를 호출! ★★★
                 _applyFilterAndRedraw();
               }
             },
@@ -221,11 +221,12 @@ class _MapPage extends State<MapPage> {
         ],
       ),
 
+      // ★★★ 4. Drawer '설정' 버튼 수정 ★★★
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
-          children: const [
-            DrawerHeader(
+          children: [
+            const DrawerHeader(
               decoration: BoxDecoration(color: Colors.blue),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,16 +241,43 @@ class _MapPage extends State<MapPage> {
                 ],
               ),
             ),
-            ListTile(title: Text('내가 선택한 아파트')),
-            ListTile(title: Text('설정')),
+            ListTile(
+              leading: const Icon(Icons.favorite),
+              title: const Text('내가 선택한 아파트'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MyFavoritePage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('설정'),
+              onTap: () async { // 👈 'async' 추가
+                Navigator.pop(context); // Drawer 닫기
+
+                // 👈 'await' 추가: SettingsPage가 닫힐 때까지 기다림
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => SettingsPage()),
+                );
+
+                // 👈 SettingsPage가 닫히면, 저장된 값을 다시 불러옴!
+                _loadMapType();
+              },
+            ),
           ],
         ),
       ),
+      // ★★★ (Drawer 수정 끝) ★★★
 
-      // ✅ 지도 ↔ 목록 전환 (Stack/테스트 코드 제거 + emptyBuilder 로직 추가)
+
       body: currentItem == 0
           ? GoogleMap(
-        mapType: MapType.normal,
+        // ★★★ 5. 'MapType.normal' 대신 변수 사용 ★★★
+        mapType: _currentMapType,
         initialCameraPosition: _googleMapCamera,
         onMapCreated: (GoogleMapController controller) {
           if (!_controller.isCompleted) {
@@ -258,16 +286,14 @@ class _MapPage extends State<MapPage> {
         },
         markers: Set<Marker>.of(markers.values),
       )
-
-      // 👇👇👇 'list' 탭 코드가 여기서부터 바뀝니다 👇👇👇
-          : documentList.isEmpty // 1. 먼저 리스트가 비어있는지 확인
+          : documentList.isEmpty
           ? const Center(
-        child: Text( // 2. 비어있다면 이 메시지를 표시
+        child: Text(
           '필터 조건에 맞는 매매 데이터가 없습니다.',
           style: TextStyle(fontSize: 16),
         ),
       )
-          : ListView.builder( // 3. 비어있지 않다면, 원래의 리스트를 표시
+          : ListView.builder(
         itemBuilder: (context, value) {
           Map<String, dynamic> item =
           documentList[value].data() as Map<String, dynamic>;
@@ -280,13 +306,12 @@ class _MapPage extends State<MapPage> {
                 trailing: const Icon(Icons.arrow_circle_right_sharp),
               ),
             ),
-            // ✅ 목록 클릭 시 상세 페이지로 이동
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => AptPage(
-                    aptHash: item['position']['geohash'], // 오타 수정: geohash
+                    aptHash: item['position']['geohash'],
                     aptInfo: item,
                   ),
                 ),
@@ -297,8 +322,8 @@ class _MapPage extends State<MapPage> {
         itemCount: documentList.length,
       ),
 
-      // ✅ 지도 복원 로직
       bottomNavigationBar: BottomNavigationBar(
+        // ... (기존과 동일) ...
         currentIndex: currentItem,
         onTap: (value) {
           if (value == 0) {
@@ -314,12 +339,12 @@ class _MapPage extends State<MapPage> {
         ],
       ),
 
-      floatingActionButton: currentItem == 0 // 👈 1. 'map' 탭일 때만
+      floatingActionButton: currentItem == 0
           ? FloatingActionButton.extended(
         onPressed: _searchApt,
         label: const Text('이 위치로 검색하기'),
       )
-          : null, // 👈 2. 'list' 탭일 때는 버튼을 숨김(null)
+          : null,
     );
   }
 }

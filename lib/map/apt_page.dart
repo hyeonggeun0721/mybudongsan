@@ -9,14 +9,20 @@ class AptPage extends StatefulWidget {
   final String aptHash;
   final Map<String, dynamic> aptInfo;
 
-  const AptPage({super.key, required this.aptHash, required this.aptInfo});
+  const AptPage({
+    super.key,
+    required this.aptHash,
+    required this.aptInfo
+  });
 
   @override
   State<AptPage> createState() => _AptPageState();
 }
 
+
 class _AptPageState extends State<AptPage> {
   late final CollectionReference<Map<String, dynamic>> _aptRef;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   int _startYear = 2006; // 시작 연도
   bool _isFavorite = false; // 찜 상태 관리
 
@@ -28,10 +34,35 @@ class _AptPageState extends State<AptPage> {
   }
 
   // 찜 상태 확인 함수
-  Future<void> _checkFavorite() async {}
+  Future<void> _checkFavorite() async {
+    final doc = await _firestore.collection('favorites').doc(widget.aptHash).get();
+    if (doc.exists) {
+      setState(() {
+        _isFavorite = true;
+      });
+    }
+  }
 
   // 찜 상태 변경 함수
-  Future<void> _toggleFavorite() async {}
+  // 찜 상태 변경 함수
+  Future<void> _toggleFavorite() async {
+    if (_isFavorite) {
+      // 이미 즐겨찾기 상태면 -> Firestore에서 삭제
+      await _firestore.collection('favorites').doc(widget.aptHash).delete();
+    } else {
+      // 즐겨찾기가 아니면 -> Firestore에 추가
+      // favorites 컬렉션에 aptId를 문서 ID로, aptData를 내용으로 저장
+      await _firestore.collection('favorites').doc(widget.aptHash).set({
+        ...widget.aptInfo, // 👈 ★★★ 여기에 ... (점 3개)가 필요합니다.
+        'timestamp': FieldValue.serverTimestamp(), // 👈 현재 시간 저장
+      });
+    }
+
+    // 아이콘 상태를 즉시 업데이트
+    setState(() {
+      _isFavorite = !_isFavorite;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +78,7 @@ class _AptPageState extends State<AptPage> {
             onPressed: _toggleFavorite,
             icon: Icon(
               _isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _isFavorite ? Colors.red : Colors.grey,
             ),
           ),
         ],
@@ -86,7 +118,7 @@ class _AptPageState extends State<AptPage> {
                   );
                 }
 
-                Map<String, dynamic> apt = snapshot.data()!;
+                Map<String, dynamic> apt = snapshot.data();
                 return Card(
                   child: Padding(
                     padding: const EdgeInsets.all(8.0),
