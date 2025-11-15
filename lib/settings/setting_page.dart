@@ -1,8 +1,10 @@
+// lib/settings/setting_page.dart
+// 지도 타입 선택 및 상태 유지를 위한 설정 페이지
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// 과제 PDF ④번 요구사항: 지도 타입 선택 및 상태 유지를 위한 설정 페이지
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 

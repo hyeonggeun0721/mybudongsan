@@ -19,10 +19,9 @@ class AptPage extends StatefulWidget {
   State<AptPage> createState() => _AptPageState();
 }
 
-
 class _AptPageState extends State<AptPage> {
   late final CollectionReference<Map<String, dynamic>> _aptRef;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // 추가
   int _startYear = 2006; // 시작 연도
   bool _isFavorite = false; // 찜 상태 관리
 
@@ -35,7 +34,10 @@ class _AptPageState extends State<AptPage> {
 
   // 찜 상태 확인 함수
   Future<void> _checkFavorite() async {
-    final doc = await _firestore.collection('favorites').doc(widget.aptHash).get();
+    final doc = await _firestore
+        .collection('favorites')
+        .doc(widget.aptHash)
+        .get();
     if (doc.exists) {
       setState(() {
         _isFavorite = true;
@@ -43,7 +45,6 @@ class _AptPageState extends State<AptPage> {
     }
   }
 
-  // 찜 상태 변경 함수
   // 찜 상태 변경 함수
   Future<void> _toggleFavorite() async {
     if (_isFavorite) {
@@ -78,7 +79,7 @@ class _AptPageState extends State<AptPage> {
             onPressed: _toggleFavorite,
             icon: Icon(
               _isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: _isFavorite ? Colors.red : Colors.grey,
+              color: _isFavorite ? Colors.red : Colors.grey, // 즐겨찾기 하트 버튼 기능 추가
             ),
           ),
         ],

@@ -1,8 +1,8 @@
+// lib/myFavorite/my_favorite_page.dart
+// 내가 선택한 아파트를 보여주는 즐겨찾기 페이지
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-
-// ★★★ 1. AptPage를 import 합니다. ★★★
-// (경로가 다르면 'apt_page.dart' 파일 위치에 맞게 수정해주세요)
 import '../map/apt_page.dart';
 
 class MyFavoritePage extends StatelessWidget {
@@ -36,7 +36,6 @@ class MyFavoritePage extends StatelessWidget {
           return ListView.builder(
             itemCount: favorites.length,
             itemBuilder: (context, index) {
-              // ★★★ 2. 데이터와 ID(hash)를 가져옵니다. ★★★
               var doc = favorites[index]; // DocumentSnapshot
               var data = doc.data() as Map<String, dynamic>; // 아파트 정보 (aptInfo)
               var aptHash = doc.id; // 문서 ID (aptHash)
@@ -46,8 +45,6 @@ class MyFavoritePage extends StatelessWidget {
                 child: ListTile(
                   title: Text(data['name'] ?? '이름 없음'),
                   subtitle: Text(data['address'] ?? '주소 없음'),
-
-                  // ★★★ 3. onTap 기능을 추가합니다. ★★★
                   onTap: () {
                     Navigator.push(
                       context,

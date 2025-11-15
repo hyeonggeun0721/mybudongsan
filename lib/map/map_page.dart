@@ -1,6 +1,7 @@
 // lib/map/map_page.dart
+// 지도 기반 Firestore 데이터 시각화 및 geoFire 반경 검색 + 상세페이지 이동 기능
+
 import 'dart:async';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -13,10 +14,7 @@ import 'map_filter_dialog.dart';
 import 'apt_page.dart';
 import '../myFavorite/my_favorite_page.dart';
 import '../settings/setting_page.dart';
-
-// ★★★ 1. SharedPreferences import 추가 ★★★
 import 'package:shared_preferences/shared_preferences.dart';
-
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -39,8 +37,6 @@ class _MapPage extends State<MapPage> {
   List<DocumentSnapshot>.empty(growable: true);
   late List<DocumentSnapshot> documentList =
   List<DocumentSnapshot>.empty(growable: true);
-
-  // ★★★ 2. 지도 타입을 저장할 변수 추가 ★★★
   MapType _currentMapType = MapType.normal; // 기본값 normal
 
   static const CameraPosition _googleMapCamera = CameraPosition(
@@ -55,20 +51,15 @@ class _MapPage extends State<MapPage> {
     _loadMapType(); // 👈 페이지 시작 시 저장된 지도 타입 불러오기
   }
 
-  // ★★★ 3. SettingsPage에서 저장한 지도 타입을 불러오는 함수 (새로 추가) ★★★
   Future<void> _loadMapType() async {
     final prefs = await SharedPreferences.getInstance();
-    // 'mapType' 키로 저장된 int 값을 불러옵니다. (SettingsPage와 동일한 로직)
     final int mapTypeIndex = prefs.getInt('mapType') ?? 0;
     setState(() {
       _currentMapType = MapType.values[mapTypeIndex];
     });
   }
-  // ★★★ (새 함수 추가 끝) ★★★
-
 
   void addCustomIcon() {
-    // ... (이하 _searchApt, _applyFilterAndRedraw, selectedCheck 함수는 기존과 동일) ...
     BitmapDescriptor.asset(
       const ImageConfiguration(),
       'res/images/apartment.png',
@@ -106,7 +97,7 @@ class _MapPage extends State<MapPage> {
         .within(center: center, radius: radius, field: field);
 
     stream.listen((List<DocumentSnapshot> documentList) {
-      this.allDocuments = documentList;
+      allDocuments = documentList;
       _applyFilterAndRedraw();
     }, onError: (error) {
       debugPrint("Firestore Stream Error: $error");
@@ -156,7 +147,7 @@ class _MapPage extends State<MapPage> {
     }
     setState(() {
       markers = newMarkers;
-      this.documentList = filteredList;
+      documentList = filteredList;
     });
   }
 
@@ -221,7 +212,6 @@ class _MapPage extends State<MapPage> {
         ],
       ),
 
-      // ★★★ 4. Drawer '설정' 버튼 수정 ★★★
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -271,12 +261,9 @@ class _MapPage extends State<MapPage> {
           ],
         ),
       ),
-      // ★★★ (Drawer 수정 끝) ★★★
-
 
       body: currentItem == 0
           ? GoogleMap(
-        // ★★★ 5. 'MapType.normal' 대신 변수 사용 ★★★
         mapType: _currentMapType,
         initialCameraPosition: _googleMapCamera,
         onMapCreated: (GoogleMapController controller) {
@@ -285,6 +272,7 @@ class _MapPage extends State<MapPage> {
           }
         },
         markers: Set<Marker>.of(markers.values),
+        myLocationButtonEnabled: false, // '내 위치' 버튼 숨기기
       )
           : documentList.isEmpty
           ? const Center(
@@ -323,7 +311,6 @@ class _MapPage extends State<MapPage> {
       ),
 
       bottomNavigationBar: BottomNavigationBar(
-        // ... (기존과 동일) ...
         currentIndex: currentItem,
         onTap: (value) {
           if (value == 0) {
@@ -343,6 +330,7 @@ class _MapPage extends State<MapPage> {
           ? FloatingActionButton.extended(
         onPressed: _searchApt,
         label: const Text('이 위치로 검색하기'),
+        //backgroundColor: Colors.blue,
       )
           : null,
     );
